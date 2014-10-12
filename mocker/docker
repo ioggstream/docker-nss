@@ -4,12 +4,17 @@
 
 IP_LOOKUP="-format={{.NetworkSettings.IPAddress}}"
 
+PORT_LOOKUP="-format \'{{range $p, $conf := .NetworkSettings.Ports}} {{$p}}.{{(index $conf 0).HostPort}}{{end}}\'"
+
 case "$@" in
     # a container which exists
     "inspect $IP_LOOKUP badger")
         echo "172.11.22.33"
         exit 0
         ;;
+    "inspect $PORT_LOOKUP badger")
+        echo "8080/tcp.18080 9999/tcp.19999"
+        exit 0
     # an image name, this does not have an IP address
     "inspect $IP_LOOKUP stoat")
         echo "<no value>"
