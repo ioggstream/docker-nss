@@ -20,10 +20,19 @@ or edit `/etc/nsswitch.conf`:
 Testing
 =======
 
-    LD_LIBRARY_PATH=`pwd` PATH=`pwd`/mocker:$PATH ./test
+ * Host resolution
 
-    LD_LIBRARY_PATH=`pwd` getent hosts badger.docker
-    LD_LIBRARY_PATH=`pwd` getent hosts 10.0.0.0
+    LD_LIBRARY_PATH=$PWD PATH=$PWD/mocker:$PATH ./test
+
+    LD_LIBRARY_PATH=$PWD getent hosts badger.docker
+    LD_LIBRARY_PATH=$PWD getent hosts 10.0.0.0
+
+
+ * Port resolution (once you have "run -p 8080 --name badger myimage")
+
+    LD_LIBRARY_PATH=$PWD getent services badger.8080
+    LD_LIBRARY_PATH=$PWD telnet localhost badger.8080
+    
 
 ToDo
 ====

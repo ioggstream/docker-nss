@@ -1,13 +1,20 @@
-#!/bin/sh
+#!/bin/bash 
 
 # A fake docker binary for use in testing
 
 IP_LOOKUP="-format={{.NetworkSettings.IPAddress}}"
+PORT_LOOKUP='--format={{range $p, $conf := .NetworkSettings.Ports}} {{$p}}.{{(index $conf 0).HostPort}}{{end}}'
 
+
+/bin/rm -f .failed.tmp
 case "$@" in
     # a container which exists
     "inspect $IP_LOOKUP badger")
         echo "172.11.22.33"
+        exit 0
+        ;;
+    "inspect $PORT_LOOKUP badger" | "HostPort")
+        echo "8080/tcp.18080 9999/tcp.19999"
         exit 0
         ;;
     # an image name, this does not have an IP address
@@ -18,6 +25,11 @@ case "$@" in
     # a complete unknown container
     "inspect $IP_LOOKUP mushroom")
         echo "Error: No such image or container: mushroom" >&2
+        exit 1
+        ;;
+    *)
+        echo >&2 "NOT FOUND"
+        /usr/bin/touch .failed.tmp
         exit 1
         ;;
 esac
