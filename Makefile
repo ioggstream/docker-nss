@@ -19,9 +19,13 @@ $(MODULE): $(OBJS) Makefile
 	$(CC) -fPIC -shared -o $@ -Wl,-soname,$@ $< $(LDFLAGS)
 
 TEST_OBJS = \
-	test.o test_port.o
+	test.o \
+	test_port.o
 
-test: $(TEST_OBJS) $(MODULE) Makefile
+test: test.o $(MODULE) Makefile
+	$(CC) -o $@ $< $(LDFLAGS)
+
+test_port: test_port.o $(MODULE) Makefile
 	$(CC) -o $@ $< $(LDFLAGS)
 
 all: $(BINS)

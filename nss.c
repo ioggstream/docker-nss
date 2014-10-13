@@ -16,7 +16,7 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#define _GNU_SOURCE
 #include <errno.h>
 #include <glib.h>
 #include <nss.h>
@@ -217,6 +217,7 @@ _nss_docker_gethostbyaddr_r (const void *addr,
 /**
  * parse mappings to docker
 8080/tcp.49156 9999/tcp.49157
+* @return: TRUE on success
 */
 static
 gboolean _find_port(int *mapped, const char *output, const char *port) {
@@ -227,11 +228,16 @@ gboolean _find_port(int *mapped, const char *output, const char *port) {
         int l = snprintf(needle, 10, "%s/tcp.", port);
         int ret = FALSE;
         for (token = strtok_r(strd, " ", &tmp); token; token=strtok_r(NULL, " ", &tmp)) {
+                //printf("needle:%s haystack:%s\n", needle, token);
                 if (!strncmp(token, needle, l)){
                         *mapped = atoi(token+l);
-                        break;
+                        //printf("found port %d\n",*mapped);
+                        ret = TRUE;
+                        goto finally;
                 }
         }
+        
+    finally:
         free(strd);
         free(needle);
         return ret;
@@ -252,7 +258,7 @@ lookup_container_port (int *hport, const char *name)
     int exit_status;
     gboolean success = FALSE;
 
-    /* remove the suffix XXX should we check that suffix==docker? */
+    /* remove the suffix XXX the check is done elsewhere, is that right? */
     name_s = g_strdup (name);
     int l = strlen(name_s);
     char *port = strrchr(name_s, '.');
@@ -264,7 +270,7 @@ lookup_container_port (int *hport, const char *name)
     char *argv[] = {
         "docker",
         "inspect",
-        "-format={{range $p, $conf := .NetworkSettings.Ports}} {{$p}}.{{(index $conf 0).HostPort}}{{end}}",
+        "--format={{range $p, $conf := .NetworkSettings.Ports}} {{$p}}.{{(index $conf 0).HostPort}}{{end}}",
         name_s,
         NULL,
     };
@@ -287,9 +293,6 @@ lookup_container_port (int *hport, const char *name)
       }
 
     stdout_s = g_strstrip (stdout_s);
-    
-    // parse port and get mapping
-    // char *port_s = g_strdup (port);
     success = _find_port(hport, stdout_s, port);
 
 finally:
@@ -300,6 +303,10 @@ finally:
     return success;
 }
 
+/**
+ * Pack the server entry data into struct servent + buffer
+ *  as specified by man:getservbyname_r
+ */
 static void
 pack_servent(struct servent *result,
         char *buffer,
@@ -307,34 +314,40 @@ pack_servent(struct servent *result,
         const char *name,
         const int *port)
 {
-    char *aliases, *s_proto;
-    size_t l, idx;
+    /* Cleanup passed buffer. */
+    if (!memset(buffer, 0, buflen)){
+        perror("memset");
+        exit(EXIT_FAILURE);
+    }
+    char *aliases;
+    size_t l;
 
     /* we can't allocate any memory, the buffer is where we need to
      * return things we want to use
      *
      * 1st, the hostname */
+    // printf("buflen: %d\n", (int)buflen);
+    char *p = buffer;
     l = strlen(name);
-    result->s_name = buffer;
-    memcpy (result->s_name, name, l);
-    buffer[l] = '\0';
-
-    idx = ALIGN (l+1);
-
-    /* 2nd, the empty aliases array */
-    aliases = buffer + idx;
-    *(char **) aliases = NULL;
-    idx += sizeof (char*);
-    result->s_aliases = (char **) aliases;
+    result->s_name = p;
+    p = mempcpy (result->s_name, name, l);
+    p += ALIGN (l+1);
+    
     
     // the protocol
-    s_proto = buffer + idx;
-    result->s_proto = s_proto;
-    memcpy(result->s_proto, "tcp", 3);
-    idx += ALIGN(4);
+    // printf("proto: %ld\n", p-buffer);
+    result->s_proto = p;
+    p = memcpy(result->s_proto, "tcp\0", 4);
     
-    /* 3rd, address */
-    result->s_port = *port;
+    /* 2nd, the empty aliases array */
+    // printf("aliases:  %ld\n", p-buffer);
+    aliases = p;
+    *(char **) aliases = NULL;
+    result->s_aliases = (char **) aliases;
+
+    
+    /* 3rd, port */
+    result->s_port = htons(*port);
 
 }
 
@@ -352,9 +365,13 @@ _nss_docker_getservbyname_r (const char *name,
         struct servent **result)
 {
     int port=0;
+    
+    /* just use tcp
     if (!proto)
         return ENOENT;
+    */
 
+    /* ignore undotted names */
     if (!index(name, '.'))
       return ENOENT;
 
@@ -362,8 +379,7 @@ _nss_docker_getservbyname_r (const char *name,
         return ENOENT;
         
         
-        
     pack_servent(result_buf, buf, buflen, name, &port);
-
-    return 0;
+    
+    return NSS_STATUS_SUCCESS;
 }

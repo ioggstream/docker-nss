@@ -5,7 +5,7 @@ install:
     - make all
     - sudo make install
     - |
-        sudo sed -i -re 's/^(hosts: .*$)/\1 docker/' /etc/nsswitch.conf
+        sudo sed -i -re 's/^(hosts: .*$)/\1 docker/;s/^(services: .*$)/\1 docker/'  /etc/nsswitch.conf
 
 # add our fake docker client to the path
 before_script:
