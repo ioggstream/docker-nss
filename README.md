@@ -1,7 +1,7 @@
 docker-nss
 ==========
 
-A libnss plugin for finding Docker containers
+A libnss plugin for finding Docker containers and their natted ports.
 
 This is still a work in progress!
 
@@ -11,12 +11,14 @@ Installing
     git clone git@github.com:danni/docker-nss.git
     cd docker-nss
     sudo make all install
-    sudo sed -i -re 's/^(hosts: .*$)/\1 docker/' /etc/nsswitch.conf
+    sudo sed -i -re 's/^((hosts|services): .*$)/\1 docker/' /etc/nsswitch.conf
 
 or edit `/etc/nsswitch.conf`:
 
     hosts:      files dns mdns4_minimal myhostname docker
                                                    ^
+    services:   files docker
+                      ^
 Testing
 =======
 
